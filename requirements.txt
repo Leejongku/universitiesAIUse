@@ -1,0 +1,12 @@
+# ──────────────────────────────────────────────
+# Korean University AI Monitor – dependencies
+# Python 3.10+
+# ──────────────────────────────────────────────
+
+feedparser==6.0.11
+requests==2.31.0
+beautifulsoup4==4.12.3
+lxml==5.2.1
+gspread==6.1.2
+oauth2client==4.1.3
+pandas==2.2.2
