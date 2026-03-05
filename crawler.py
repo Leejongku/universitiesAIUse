@@ -12,7 +12,8 @@ Options:
     --dry-run      Run without writing to Google Sheets (for testing)
 ──────────────────────────────────────────────────────────────
 """
-
+from ai_service_crawler import AIServiceCrawler
+from ai_policy_crawler import AIPolicyCrawler
 import argparse
 import logging
 import sys
@@ -246,3 +247,31 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+print("AI 서비스 탐지 시작")
+
+ai_crawler = AIServiceCrawler(universities)
+
+services = ai_crawler.crawl()
+
+for s in services:
+
+    sheet.save_ai_page(
+        s["university"],
+        s["title"],
+        s["url"],
+    )
+
+
+print("AI 정책 탐지 시작")
+
+policy_crawler = AIPolicyCrawler(universities)
+
+policies = policy_crawler.crawl()
+
+for p in policies:
+
+    sheet.save_policy(
+        p["university"],
+        p["title"],
+        p["url"],
+    )
