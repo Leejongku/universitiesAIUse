@@ -10,10 +10,13 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+import time
+import datetime
 import importlib
 import sheet_manager
 import ai_service_crawler
 import ai_knowledge
+from crawler import load_universities
 importlib.reload(ai_knowledge)
 importlib.reload(ai_service_crawler)
 importlib.reload(sheet_manager)
@@ -108,8 +111,6 @@ with st.sidebar:
     st.caption("새로운 데이터를 검색하고 시트에 저장합니다.")
     
     if st.button("AI 서비스 스크래핑 실행", use_container_width=True):
-        import time
-        from crawler import load_universities
         from ai_service_crawler import AIServiceCrawler
 
         unis_data = load_universities()
@@ -161,8 +162,6 @@ with st.sidebar:
         st.rerun()
 
     if st.button("AI 정책 스크래핑 실행", use_container_width=True):
-        import time
-        from crawler import load_universities
         from ai_policy_crawler import AIPolicyCrawler
 
         unis_data = load_universities()
@@ -189,7 +188,6 @@ with st.sidebar:
         st.rerun()
 
     if st.button("최신 AI 트렌드 수집 (Top 20)", use_container_width=True):
-        import time
         from news_collector import collect_global_top_ai_news, NEWS_QUERIES
 
         st.markdown("**🔍 글로벌 AI 뉴스 수집 중...**")
@@ -361,7 +359,6 @@ with tab4:
     else:
         if st.button("🪄 AI 주간 보고서 생성/갱신", use_container_width=True):
             with st.spinner("최신 뉴스를 분석하여 보고서를 작성 중입니다..."):
-                import datetime
                 today = datetime.datetime.now().strftime("%Y년 %m월 %d일")
                 
                 news_list = df_news.to_dict('records')
