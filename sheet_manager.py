@@ -50,13 +50,20 @@ class SheetManager:
     # -----------------------------------------------------
 
     def connect(self):
-
         logger.info("Connecting to Google Sheets ...")
 
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(
-            str(self._cred_path),
-            SCOPES,
-        )
+        if isinstance(self._cred_path, dict):
+            # Load from dictionary (e.g., Streamlit Secrets)
+            credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+                self._cred_path,
+                SCOPES,
+            )
+        else:
+            # Load from file path
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                str(self._cred_path),
+                SCOPES,
+            )
 
         self._client = gspread.authorize(credentials)
 

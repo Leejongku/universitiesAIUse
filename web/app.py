@@ -85,14 +85,19 @@ def load_data(sheet: SheetManager):
 st.title("🏫 AI University Monitor")
 st.caption("국내 대학 생성형 AI 활용 현황(서비스/정책/뉴스)")
 
-# credentials.json 위치 체크 (프로젝트 루트에 있어야 함)
-if not os.path.exists("credentials.json"):
-    st.error("credentials.json 파일이 프로젝트 루트에 없습니다. (universitiesAIUse/credentials.json)")
-    st.stop()
-
 # Google Sheets 연결
-sheet = SheetManager()
 try:
+    if "gcp_service_account" in st.secrets:
+        # Streamlit Cloud 환경 (Secrets 사용)
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        sheet = SheetManager(credentials_path=creds_dict)
+    else:
+        # 로컬 환경 (파일 사용)
+        if not os.path.exists("credentials.json"):
+            st.error("credentials.json 파일이 없습니다. 로컬에서는 파일이 필요하며, 웹에서는 Streamlit Secrets 설정이 필요합니다.")
+            st.stop()
+        sheet = SheetManager()
+    
     sheet.connect()
 except Exception as e:
     st.error(f"Google Sheets 연결 실패: {e}")
