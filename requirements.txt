@@ -18,3 +18,5 @@ google-auth
 google-auth-oauthlib
 streamlit
 pandas
+oauth2client
+lxml
