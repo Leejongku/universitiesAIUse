@@ -21,10 +21,12 @@ logger = logging.getLogger(__name__)
 
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
 NEWS_QUERIES = [
-    "대학 생성형 AI",
-    "대학 ChatGPT 교육",
-    "대학 AI 가이드라인",
-    "대학 LLM 교육",
+    "생성형 AI 기술 추세",
+    "ChatGPT 최신 동향",
+    "클로드 (Claude) AI 업데이트",
+    "구글 제미나이",
+    "온디바이스 AI",
+    "AI 온톨로지 (Ontology) 및 지식 그래프 실무 활용",
 ]
 
 FETCH_DELAY = 2.0  # seconds between RSS fetches (be polite)
@@ -215,3 +217,36 @@ class AIPageCollector:
             ))
 
         return results
+
+# ──────────────────────────────────────────────
+# Global AI News Collection
+# ──────────────────────────────────────────────
+
+def collect_global_top_ai_news(limit: int = 20) -> list[NewsItem]:
+    import email.utils
+    import datetime
+
+    queries = [
+        "대학 생성형 AI 혁신",
+        "생성형 AI 대학 트렌드",
+        "인공지능 교육 트렌드",
+        "해외 대학 AI 사례",
+    ]
+
+    collector = NewsCollector(queries=queries, delay=1.0)
+    items = collector.collect()
+
+    def parse_date(date_str: str) -> datetime.datetime:
+        try:
+            dt_tuple = email.utils.parsedate_tz(date_str)
+            if dt_tuple:
+                return datetime.datetime.fromtimestamp(
+                    email.utils.mktime_tz(dt_tuple), 
+                    datetime.timezone.utc
+                )
+        except Exception:
+            pass
+        return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+
+    items.sort(key=lambda x: parse_date(x.published), reverse=True)
+    return items[:limit]

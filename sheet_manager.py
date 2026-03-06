@@ -29,7 +29,8 @@ SCOPES = [
 SHEET_HEADERS = {
     "universities": ["name", "alias", "domain"],
     "articles": ["university", "title", "url", "date", "collected_at"],
-    "ai_pages": ["university", "title", "url", "collected_at"],
+    "ai_pages": ["university", "official_status", "ai_model", "platform", "application_area", "partner", "title", "url", "collected_at"],
+    "policies": ["university", "title", "url", "collected_at"],
 }
 
 
@@ -163,6 +164,145 @@ service account:
         logger.info("Saved AI page | %s", url)
 
         return True
+
+    # -----------------------------------------------------
+
+    def save_ai_pages_batch(self, ai_pages: list[dict]) -> int:
+        ws = self._worksheet("ai_pages")
+        rows_to_append = []
+        count = 0
+
+        for item in ai_pages:
+            url = item.get("url")
+            if self._is_duplicate("ai_pages", url):
+                continue
+            
+            rows_to_append.append([
+                item.get("university"),
+                item.get("official_status", ""),
+                item.get("ai_model", ""),
+                item.get("platform", ""),
+                item.get("application_area", ""),
+                item.get("partner", ""),
+                item.get("title"),
+                url,
+                self._now()
+            ])
+            self._cache_url("ai_pages", url)
+            count += 1
+            
+        if rows_to_append:
+            ws.append_rows(rows_to_append)
+            logger.info("Batch saved %d AI pages", count)
+            
+        return count
+
+    # -----------------------------------------------------
+
+    def save_ai_policy(self, university, title, url):
+
+        if self._is_duplicate("policies", url):
+
+            return False
+
+        ws = self._worksheet("policies")
+
+        row = [
+            university,
+            title,
+            url,
+            self._now(),
+        ]
+
+        ws.append_row(row)
+
+        self._cache_url("policies", url)
+
+        logger.info("Saved AI policy | %s", url)
+
+        return True
+
+    # -----------------------------------------------------
+
+    def save_ai_policies_batch(self, policies: list[dict]) -> int:
+        ws = self._worksheet("policies")
+        rows_to_append = []
+        count = 0
+
+        for item in policies:
+            url = item.get("url")
+            if self._is_duplicate("policies", url):
+                continue
+            
+            rows_to_append.append([
+                item.get("university"),
+                item.get("title"),
+                url,
+                self._now()
+            ])
+            self._cache_url("policies", url)
+            count += 1
+            
+        if rows_to_append:
+            ws.append_rows(rows_to_append)
+            logger.info("Batch saved %d AI policies", count)
+            
+        return count
+
+    # -----------------------------------------------------
+
+    def clear_sheet_data(self, sheet_name: str):
+        """Clears all data in the specified sheet except for the header row."""
+        try:
+            ws = self._worksheet(sheet_name)
+            # Find how many rows exist
+            rows = ws.get_all_values()
+            if len(rows) > 1:
+                # Delete rows starting from the second row (index 2 in 1-based gspread)
+                # up to the total number of rows.
+                ws.delete_rows(2, len(rows))
+                logger.info("Cleared %d existing rows from '%s'", len(rows) - 1, sheet_name)
+            
+            # Ensure headers match current code configuration
+            if sheet_name in SHEET_HEADERS:
+                try:
+                    # Gspread 6.0+ syntax
+                    ws.update(values=[SHEET_HEADERS[sheet_name]], range_name='A1')
+                except TypeError:
+                    # Older gspread syntax
+                    ws.update('A1', [SHEET_HEADERS[sheet_name]])
+            
+            # Reset cache for this sheet
+            self._url_cache[sheet_name] = set()
+            return True
+        except Exception as e:
+            logger.warning("Failed to clear sheet '%s': %s", sheet_name, e)
+            return False
+
+    # -----------------------------------------------------
+
+    def save_global_news(self, news_items):
+        self.clear_sheet_data("articles")
+        
+        ws = self._worksheet("articles")
+        count = 0
+        rows_to_append = []
+        for item in news_items:
+            if self._is_duplicate("articles", item.url):
+                continue
+            row = [
+                "전체",
+                item.title,
+                item.url,
+                item.published,
+                self._now(),
+            ]
+            ws.append_row(row)
+            self._cache_url("articles", item.url)
+            count += 1
+        
+        logger.info("Saved %d global news items", count)
+        return count
 
     # -----------------------------------------------------
     # Helpers

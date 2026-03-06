@@ -1,277 +1,178 @@
 """
 crawler.py
-──────────────────────────────────────────────────────────────
-Main entry point for the Korean University AI Monitor Crawler.
+Main entry point for AI University Monitor crawler.
 
-Usage:
-    python crawler.py [--skip-news] [--skip-pages] [--dry-run]
-
-Options:
-    --skip-news    Skip Google News RSS collection
-    --skip-pages   Skip official AI page discovery
-    --dry-run      Run without writing to Google Sheets (for testing)
-──────────────────────────────────────────────────────────────
+Usage examples:
+  python crawler.py                 # 서비스 + 정책만 실행
+  python crawler.py --news          # 뉴스 포함 실행
+  python crawler.py --news --dry-run
 """
-from ai_service_crawler import AIServiceCrawler
-from ai_policy_crawler import AIPolicyCrawler
+# from news_collector import run_news_pipeline
 import argparse
+import csv
 import logging
-import sys
 from pathlib import Path
 
-from article_parser import fetch_article
-from news_collector import NewsCollector, AIPageCollector
+from ai_service_crawler import AIServiceCrawler
+from ai_policy_crawler import AIPolicyCrawler
+from news_collector import collect_global_top_ai_news
+
 from sheet_manager import SheetManager
-from university_matcher import UniversityMatcher
 
-# ──────────────────────────────────────────────
-# Logging setup
-# ──────────────────────────────────────────────
+# -------------------------------------------------
+# Logging
+# -------------------------------------------------
 
-LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(message)s"
-LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-
-def setup_logging(level: int = logging.INFO) -> None:
-    logging.basicConfig(
-        level=level,
-        format=LOG_FORMAT,
-        datefmt=LOG_DATE_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(Path(__file__).parent / "crawler.log", encoding="utf-8"),
-        ],
-    )
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
 
 logger = logging.getLogger(__name__)
 
+# -------------------------------------------------
+# Config
+# -------------------------------------------------
 
-# ──────────────────────────────────────────────
-# Pipeline steps
-# ──────────────────────────────────────────────
+BASE_DIR = Path(__file__).parent
+UNIVERSITIES_FILE = BASE_DIR / "universities.csv"
 
-def run_news_pipeline(
-    matcher: UniversityMatcher,
-    sheet: SheetManager,
-    dry_run: bool = False,
-) -> tuple[int, int]:
-    """
-    Collect news articles → parse → match universities → save.
-    Returns (articles_checked, articles_saved).
-    """
-    collector = NewsCollector()
-    news_items = collector.collect()
+# -------------------------------------------------
+# Load universities
+# -------------------------------------------------
 
-    checked = 0
-    saved = 0
+def load_universities():
+    universities = []
 
-    for i, item in enumerate(news_items, start=1):
-        _progress(i, len(news_items), label="articles")
+    if not UNIVERSITIES_FILE.exists():
+        raise FileNotFoundError("universities.csv not found")
 
-        # Skip if URL already in sheet
-        if item.url in sheet.get_existing_article_urls():
-            logger.debug("Already in sheet, skipping: %s", item.url)
-            continue
+    with open(UNIVERSITIES_FILE, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
 
-        # Fetch full article content
-        content = fetch_article(item.url)
-        checked += 1
+        for row in reader:
+            universities.append(
+                {
+                    "name": row.get("name"),
+                    "alias": row.get("alias"),
+                    "domain": row.get("domain"),
+                }
+            )
 
-        if not content.ok:
-            logger.debug("Could not fetch article: %s (%s)", item.url, content.error)
-            continue
+    logger.info("Loaded %s universities", len(universities))
 
-        # Combine title + body for matching
-        full_text = f"{item.title} {content.title} {content.text}"
-        matched_unis = matcher.find_in_text(full_text)
-
-        if not matched_unis:
-            logger.debug("No university matched for: %s", item.title[:60])
-            continue
-
-        for uni in matched_unis:
-            logger.info("Matched university: %s | %s", uni.name, item.title[:60])
-            if not dry_run:
-                inserted = sheet.save_article(
-                    university=uni.name,
-                    title=item.title,
-                    url=item.url,
-                    date=item.published,
-                )
-                if inserted:
-                    saved += 1
-            else:
-                logger.info("[DRY RUN] Would save article: %s – %s", uni.name, item.title[:60])
-                saved += 1
-
-    return checked, saved
+    return universities
 
 
-def run_ai_page_pipeline(
-    matcher: UniversityMatcher,
-    sheet: SheetManager,
-    dry_run: bool = False,
-) -> tuple[int, int]:
-    """
-    Search for official AI pages for each university → save.
-    Returns (pages_found, pages_saved).
-    """
-    page_collector = AIPageCollector()
-    found = 0
-    saved = 0
-
-    universities = matcher.all_universities()
-
-    for i, uni in enumerate(universities, start=1):
-        _progress(i, len(universities), label="universities (AI pages)")
-        logger.info("Searching AI pages for: %s", uni.name)
-
-        pages = page_collector.collect_for_university(uni.name)
-        found += len(pages)
-
-        for page in pages:
-            if page.url in sheet.get_existing_ai_page_urls():
-                logger.debug("AI page already saved: %s", page.url)
-                continue
-
-            if not dry_run:
-                inserted = sheet.save_ai_page(
-                    university=page.university,
-                    title=page.title,
-                    url=page.url,
-                )
-                if inserted:
-                    saved += 1
-            else:
-                logger.info("[DRY RUN] Would save AI page: %s – %s", uni.name, page.url)
-                saved += 1
-
-    return found, saved
-
-
-# ──────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────
-
-def _progress(current: int, total: int, label: str = "") -> None:
-    pct = int(current / total * 100) if total else 0
-    bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
-    sys.stdout.write(f"\r  [{bar}] {pct:3d}% – {current}/{total} {label}  ")
-    sys.stdout.flush()
-    if current == total:
-        sys.stdout.write("\n")
-
-
-# ──────────────────────────────────────────────
+# -------------------------------------------------
 # Main
-# ──────────────────────────────────────────────
+# -------------------------------------------------
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Korean University AI Monitor Crawler"
+def main():
+
+    parser = argparse.ArgumentParser(description="AI University Monitor crawler")
+
+    parser.add_argument(
+        "--news",
+        action="store_true",
+        help="Enable news crawling",
     )
-    parser.add_argument("--skip-news", action="store_true", help="Skip news RSS collection")
-    parser.add_argument("--skip-pages", action="store_true", help="Skip AI page discovery")
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Do not write to Google Sheets (test mode)",
+        help="Run without saving to Google Sheets",
     )
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
-    return parser.parse_args()
 
+    args = parser.parse_args()
 
-def main() -> None:
-    args = parse_args()
-    setup_logging(logging.DEBUG if args.verbose else logging.INFO)
+    logger.info("======================================")
+    logger.info("AI University Monitor Crawler Start")
+    logger.info("======================================")
 
-    logger.info("=" * 60)
-    logger.info("Starting crawler")
-    if args.dry_run:
-        logger.info("DRY RUN mode – nothing will be written to Google Sheets")
-    logger.info("=" * 60)
+    # 1️⃣ 대학 목록 로드
+    universities = load_universities()
 
-    # ── 1. Load university data ─────────────────
-    matcher = UniversityMatcher()
-    logger.info("Loaded %d universities.", len(matcher.all_universities()))
-
-    # ── 2. Connect to Google Sheets ─────────────
+    # 2️⃣ Google Sheets 연결
     sheet = SheetManager()
+    sheet.connect()
+
+    sheet.save_universities(universities)
+
+    # -------------------------------------------------
+    # NEWS CRAWLER (OPTIONAL)
+    # -------------------------------------------------
+
+    if args.news:
+
+        logger.info("")
+        logger.info("뉴스 수집 시작")
+
+        if not args.dry_run:
+            news_items = collect_global_top_ai_news(20)
+            sheet.clear_sheet_data("articles")
+            saved = sheet.save_global_news(news_items)
+            logger.info("글로벌 AI 뉴스 저장 완료: %s개", saved)
+
+    else:
+        logger.info("")
+        logger.info("뉴스 크롤링 건너뜀 (--news 옵션 없음)")
+
+    # -------------------------------------------------
+    # AI SERVICE CRAWLER
+    # -------------------------------------------------
+
+    logger.info("")
+    logger.info("AI 서비스 탐지 시작")
+
+    ai_crawler = AIServiceCrawler(universities)
+    services_raw = ai_crawler.run()   # 새로운 통합 메서드 (KB + 공지 크롤링)
+    logger.info("AI 서비스 %s개 발견", len(services_raw))
+
+    # run() 출력 키(kb_ai_model 등) → save_ai_pages_batch 입력 키로 변환
+    services = []
+    for item in services_raw:
+        notice_summary = " | ".join(item.get("notice_titles", [])[:2])
+        uni_domain = next((u["domain"] for u in universities if u["name"] == item.get("university")), "")
+        services.append({
+            "university":      item.get("university"),
+            "official_status": item.get("official_status", "확인 중"),
+            "ai_model":        item.get("kb_ai_model", "-"),
+            "platform":        item.get("kb_platform", "-"),
+            "application_area": item.get("kb_application_area", "-"),
+            "partner":         item.get("kb_partner", "-"),
+            "title":           notice_summary or "(KB 기반 데이터)",
+            "url":             item.get("policy_url") or f"https://{uni_domain}",
+        })
+
     if not args.dry_run:
-        try:
-            sheet.connect()
-        except FileNotFoundError:
-            logger.error(
-                "credentials.json not found. "
-                "Place your Google Service Account credentials at: credentials.json"
-            )
-            sys.exit(1)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to connect to Google Sheets: %s", exc)
-            sys.exit(1)
+        sheet.clear_sheet_data("ai_pages")
+        saved_services = sheet.save_ai_pages_batch(services)
+        logger.info("AI 서비스 %s개 저장 완료", saved_services)
 
-        # Sync university list to sheet
-        uni_dicts = [
-            {"name": u.name, "alias": u.alias, "domain": u.domain}
-            for u in matcher.all_universities()
-        ]
-        sheet.save_universities(uni_dicts)
-    else:
-        logger.info("[DRY RUN] Skipping Google Sheets connection.")
+    # -------------------------------------------------
+    # AI POLICY CRAWLER
+    # -------------------------------------------------
 
-    # ── 3. News pipeline ────────────────────────
-    if not args.skip_news:
-        logger.info("-" * 40)
-        logger.info("Phase 1: News article collection")
-        logger.info("-" * 40)
-        checked, saved = run_news_pipeline(matcher, sheet, dry_run=args.dry_run)
-        logger.info("News pipeline complete. Checked: %d | Saved: %d", checked, saved)
-    else:
-        logger.info("Skipping news pipeline (--skip-news).")
+    logger.info("")
+    logger.info("AI 정책 탐지 시작")
 
-    # ── 4. AI page discovery ────────────────────
-    if not args.skip_pages:
-        logger.info("-" * 40)
-        logger.info("Phase 2: Official AI page discovery")
-        logger.info("-" * 40)
-        found, saved_pages = run_ai_page_pipeline(matcher, sheet, dry_run=args.dry_run)
-        logger.info("AI page pipeline complete. Found: %d | Saved: %d", found, saved_pages)
-    else:
-        logger.info("Skipping AI page pipeline (--skip-pages).")
+    policy_crawler = AIPolicyCrawler(universities)
+    policies = policy_crawler.crawl()
+    logger.info("AI 정책 %s개 발견", len(policies))
 
-    logger.info("=" * 60)
-    logger.info("Crawler finished successfully.")
-    logger.info("=" * 60)
+    if not args.dry_run:
+        sheet.clear_sheet_data("policies")
+        saved_policies = sheet.save_ai_policies_batch(policies)
+        logger.info("AI 정책 %s개 저장 완료", saved_policies)
 
+    logger.info("")
+    logger.info("======================================")
+    logger.info("Crawler Finished")
+    logger.info("======================================")
+
+
+# -------------------------------------------------
 
 if __name__ == "__main__":
     main()
-print("AI 서비스 탐지 시작")
-
-ai_crawler = AIServiceCrawler(universities)
-
-services = ai_crawler.crawl()
-
-for s in services:
-
-    sheet.save_ai_page(
-        s["university"],
-        s["title"],
-        s["url"],
-    )
-
-
-print("AI 정책 탐지 시작")
-
-policy_crawler = AIPolicyCrawler(universities)
-
-policies = policy_crawler.crawl()
-
-for p in policies:
-
-    sheet.save_policy(
-        p["university"],
-        p["title"],
-        p["url"],
-    )
