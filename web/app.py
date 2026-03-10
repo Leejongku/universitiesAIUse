@@ -109,6 +109,13 @@ except Exception as e:
 with st.sidebar:
     st.header("🛠️ 관리자 도구 (크롤링)")
     st.caption("새로운 데이터를 검색하고 시트에 저장합니다.")
+
+    if st.button("🔄 데이터 강제 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.rerun()
+
+    st.divider()
     
     if st.button("AI 서비스 스크래핑 실행", use_container_width=True):
         from ai_service_crawler import AIServiceCrawler
@@ -315,28 +322,25 @@ with tab3:
     st.subheader("📰 최신 생성형 AI 동향 보고서")
     st.caption(f"수집일시: {__import__('datetime').datetime.now().strftime('%Y년 %m월 %d일 %H:%M')} | 생성형 AI 및 온톨로지 관련 최신 뉴스 최대 {total_news}건")
     
+    st.markdown("---")
+    # 📺 Featured YouTube Summary Section (Always Visible)
+    with st.expander("📺 **오늘의 주요 AI 소식 (조코딩 유튜브 요약)**", expanded=True):
+        st.markdown("""
+        **[AI뉴스 - GPT-5.4, Gemini 3.1 Flash-Lite 등](https://www.youtube.com/watch?v=I8qs9edQvIw)**
+        
+        *   **OpenAI GPT-5.4 공개:** 전문 업무 추론 능력 비약적 상승 (정확도 83%), 화면 조작 에이전트 기능 강화.
+        *   **Anthropic Claude 업데이트:** 타 LLM 메모리 이전 기능(Import Memory) 및 로컬 개발용 'Claude Code' 출시.
+        *   **Google Gemini 3.1:** 더 가볍고 빠른 Flash-Lite 모델 출시 및 NotebookLM 시네마틱 비디오 생성 기능 추가.
+        *   **기타:** LTX-2.3, Qwen 3.5 Small 등 오픈소스 모델 강세 및 메타 스마트 안경 논란.
+        """)
+        st.caption("※ 이 섹션은 주요 기술 테마를 요약하여 제공합니다.")
+
     if df_news.empty:
-        st.info("수집된 뉴스가 없습니다. '최신 AI 트렌드 수집' 버튼을 눌러주세요.")
+        st.info("수집된 뉴스가 없습니다. 왼쪽 사이드바의 '최신 AI 트렌드 수집' 버튼을 눌러주세요.")
     else:
         df_n = df_news.copy()
-        st.markdown("---")
-        st.markdown(f"""
-## 🤖 생성형 AI 트렌드 동향 (최신 {len(df_n)}건)
-
-> 이 보고서는 ChatGPT, Claude, Gemini, 온디바이스 AI 등 글로벌 생성형 AI 최신 동향을 종합합니다.
-        """)
-
-        # 📺 Featured YouTube Summary Section
-        with st.expander("📺 **오늘의 주요 AI 소식 (조코딩 유튜브 요약)**", expanded=True):
-            st.markdown("""
-            **[AI뉴스 - GPT-5.4, Gemini 3.1 Flash-Lite 등](https://www.youtube.com/watch?v=I8qs9edQvIw)**
-            
-            *   **OpenAI GPT-5.4 공개:** 전문 업무 추론 능력 비약적 상승 (정확도 83%), 화면 조작 에이전트 기능 강화.
-            *   **Anthropic Claude 업데이트:** 타 LLM 메모리 이전 기능(Import Memory) 및 로컬 개발용 'Claude Code' 출시.
-            *   **Google Gemini 3.1:** 더 가볍고 빠른 Flash-Lite 모델 출시 및 NotebookLM 시네마틱 비디오 생성 기능 추가.
-            *   **기타:** LTX-2.3, Qwen 3.5 Small 등 오픈소스 모델 강세 및 메타 스마트 안경 논란.
-            """)
-            st.caption("※ 이 섹션은 주요 기술 테마를 요약하여 제공합니다.")
+        st.markdown(f"## 🤖 생성형 AI 트렌드 동향 (최신 {len(df_n)}건)")
+        st.markdown("> 이 보고서는 ChatGPT, Claude, Gemini, 온디바이스 AI 등 글로벌 생성형 AI 최신 동향을 종합합니다.")
 
         for i, row in df_n.iterrows():
             title = row.get("title", "(제목없음)")
