@@ -323,8 +323,20 @@ with tab3:
         st.markdown(f"""
 ## 🤖 생성형 AI 트렌드 동향 (최신 {len(df_n)}건)
 
-> 이 보고서는 ChatGPT, Claude, Gemini, 온디바이스 AI 등 글로벌 생성형 AI 쭜신 동향을 종합합니다.
+> 이 보고서는 ChatGPT, Claude, Gemini, 온디바이스 AI 등 글로벌 생성형 AI 최신 동향을 종합합니다.
         """)
+
+        # 📺 Featured YouTube Summary Section
+        with st.expander("📺 **오늘의 주요 AI 소식 (조코딩 유튜브 요약)**", expanded=True):
+            st.markdown("""
+            **[AI뉴스 - GPT-5.4, Gemini 3.1 Flash-Lite 등](https://www.youtube.com/watch?v=I8qs9edQvIw)**
+            
+            *   **OpenAI GPT-5.4 공개:** 전문 업무 추론 능력 비약적 상승 (정확도 83%), 화면 조작 에이전트 기능 강화.
+            *   **Anthropic Claude 업데이트:** 타 LLM 메모리 이전 기능(Import Memory) 및 로컬 개발용 'Claude Code' 출시.
+            *   **Google Gemini 3.1:** 더 가볍고 빠른 Flash-Lite 모델 출시 및 NotebookLM 시네마틱 비디오 생성 기능 추가.
+            *   **기타:** LTX-2.3, Qwen 3.5 Small 등 오픈소스 모델 강세 및 메타 스마트 안경 논란.
+            """)
+            st.caption("※ 이 섹션은 주요 기술 테마를 요약하여 제공합니다.")
 
         for i, row in df_n.iterrows():
             title = row.get("title", "(제목없음)")
