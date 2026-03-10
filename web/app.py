@@ -239,7 +239,10 @@ st.divider()
 tab1, tab2, tab3, tab4 = st.tabs(["🤖 AI 서비스", "📜 AI 정책", "📰 관련 뉴스", "📊 주간 AI 보고서"])
 
 with tab1:
-    st.subheader("전체 대학 AI 서비스 현황")
+    last_updated = ""
+    if not df_services.empty and "collected_at" in df_services.columns:
+        last_updated = f" (최종 갱신: {df_services['collected_at'].max()})"
+    st.subheader(f"전체 대학 AI 서비스 현황{last_updated}")
     if df_services.empty:
         st.info("ai_pages 시트 데이터가 없습니다.")
     else:
@@ -319,12 +322,13 @@ with tab2:
         st.dataframe(df, use_container_width=True, column_config=column_config)
 
 with tab3:
-    st.subheader("📰 최신 생성형 AI 동향 보고서")
-    st.caption(f"수집일시: {__import__('datetime').datetime.now().strftime('%Y년 %m월 %d일 %H:%M')} | 생성형 AI 및 온톨로지 관련 최신 뉴스 최대 {total_news}건")
+    st.subheader("📺 오늘의 주요 AI 소식 (조코딩 유튜브 요약)")
+    # Using current date for the summary as it's a fixed featured content for now
+    st.caption(f"기준일자: {__import__('datetime').datetime.now().strftime('%Y년 %m월 %d일')}")
     
     st.markdown("---")
-    # 📺 Featured YouTube Summary Section (Always Visible)
-    with st.expander("📺 **오늘의 주요 AI 소식 (조코딩 유튜브 요약)**", expanded=True):
+    # Featured YouTube Summary Section
+    with st.expander("🔍 **핵심 요약 리포트 보기**", expanded=True):
         st.markdown("""
         **[AI뉴스 - GPT-5.4, Gemini 3.1 Flash-Lite 등](https://www.youtube.com/watch?v=I8qs9edQvIw)**
         
@@ -333,14 +337,13 @@ with tab3:
         *   **Google Gemini 3.1:** 더 가볍고 빠른 Flash-Lite 모델 출시 및 NotebookLM 시네마틱 비디오 생성 기능 추가.
         *   **기타:** LTX-2.3, Qwen 3.5 Small 등 오픈소스 모델 강세 및 메타 스마트 안경 논란.
         """)
-        st.caption("※ 이 섹션은 주요 기술 테마를 요약하여 제공합니다.")
+        st.caption("※ 조코딩 유튜브 채널의 최신 AI 소식을 기반으로 작성되었습니다.")
 
     if df_news.empty:
         st.info("수집된 뉴스가 없습니다. 왼쪽 사이드바의 '최신 AI 트렌드 수집' 버튼을 눌러주세요.")
     else:
         df_n = df_news.copy()
-        st.markdown(f"## 🤖 생성형 AI 트렌드 동향 (최신 {len(df_n)}건)")
-        st.markdown("> 이 보고서는 ChatGPT, Claude, Gemini, 온디바이스 AI 등 글로벌 생성형 AI 최신 동향을 종합합니다.")
+        st.markdown("### 🤖 수집된 최신 뉴스")
 
         for i, row in df_n.iterrows():
             title = row.get("title", "(제목없음)")
